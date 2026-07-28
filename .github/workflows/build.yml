@@ -1,0 +1,59 @@
+name: Build
+
+on:
+  push:
+    branches: [master]
+
+jobs:
+  build:
+    name: Build (${{ matrix.target }})
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-pc-windows-gnu
+            os: ubuntu-latest
+            filename: censors.exe
+
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+            filename: censors
+
+          - target: aarch64-apple-darwin
+            os: macos-latest
+            filename: censors
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Install MinGW
+        if: matrix.target == 'x86_64-pc-windows-gnu'
+        run: sudo apt-get install --yes --no-install-recommends gcc-mingw-w64-x86-64-win32 g++-mingw-w64-x86-64
+
+      - name: Install SDL3 dependencies
+        if: matrix.target == 'x86_64-unknown-linux-gnu'
+        run: |
+          sudo apt-get install build-essential git make \
+          pkg-config cmake ninja-build gnome-desktop-testing libasound2-dev libpulse-dev \
+          libaudio-dev libfribidi-dev libjack-dev libsndio-dev libx11-dev libxext-dev \
+          libxrandr-dev libxcursor-dev libxfixes-dev libxi-dev libxss-dev libxtst-dev \
+          libxkbcommon-dev libdrm-dev libgbm-dev libgl1-mesa-dev libgles2-mesa-dev \
+          libegl1-mesa-dev libdbus-1-dev libibus-1.0-dev libudev-dev libthai-dev libusb-1.0-0-dev \
+          libpipewire-0.3-dev libwayland-dev libdecor-0-dev
+
+      - name: Build
+        run: cargo build --release --target ${{ matrix.target }}
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: censors-${{ matrix.target }}
+          path: target/${{ matrix.target }}/release/${{ matrix.filename }}
